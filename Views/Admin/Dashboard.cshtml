@@ -1,0 +1,243 @@
+@model List<ReadyStatusApp.ViewModels.UserStatusViewModel>
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-dark text-white py-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="mb-0">
+                            <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
+                        </h2>
+                        <div>
+                            <span class="badge bg-success me-2" id="readyCount">
+                                <i class="bi bi-check-circle me-1"></i>Ready: @Model.Count(u => u.IsReady)
+                            </span>
+                            <span class="badge bg-danger" id="notReadyCount">
+                                <i class="bi bi-x-circle me-1"></i>Not Ready: @Model.Count(u => !u.IsReady)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <h4 class="mb-4"><i class="bi bi-people me-2"></i>User Status Monitor</h4>
+                    
+                    @if (Model.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle" id="usersTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th><i class="bi bi-person me-1"></i>User</th>
+                                        <th><i class="bi bi-envelope me-1"></i>Email</th>
+                                        <th class="text-center"><i class="bi bi-toggle-on me-1"></i>Status</th>
+                                        <th><i class="bi bi-clock me-1"></i>Last Changed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in Model)
+                                    {
+                                        <tr id="user-@user.UserId" class="user-row">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-circle me-3 @(user.IsReady ? "bg-success" : "bg-secondary")">
+                                                        @user.FullName.Substring(0, 1).ToUpper()
+                                                    </div>
+                                                    <span class="fw-semibold">@user.FullName</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-muted">@user.Email</td>
+                                            <td class="text-center">
+                                                <span class="status-pill @(user.IsReady ? "status-ready" : "status-not-ready")">
+                                                    <i class="bi @(user.IsReady ? "bi-check-circle-fill" : "bi-x-circle-fill") me-1"></i>
+                                                    @(user.IsReady ? "READY" : "NOT READY")
+                                                </span>
+                                            </td>
+                                            <td class="text-muted last-changed">
+                                                @if (user.LastStatusChange.HasValue)
+                                                {
+                                                    @user.LastStatusChange.Value.ToString("MMM dd, yyyy HH:mm:ss")
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted fst-italic">Never changed</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-people text-muted" style="font-size: 5rem;"></i>
+                            <h4 class="mt-3 text-muted">No Users Yet</h4>
+                            <p class="text-muted">Users will appear here once they register.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time notification toast -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="bi bi-bell-fill text-primary me-2"></i>
+                <strong class="me-auto">Status Update</strong>
+                <small id="toastTime">Just now</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .avatar-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        transition: all 0.3s ease;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 20px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+    }
+
+    .status-ready {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+    }
+
+    .status-not-ready {
+        background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+        color: white;
+    }
+
+    .user-row {
+        transition: all 0.3s ease;
+    }
+
+    .user-row.highlight {
+        animation: highlightRow 2s ease;
+    }
+
+    @@keyframes highlightRow {
+        0% { background-color: #fff3cd; }
+        100% { background-color: transparent; }
+    }
+
+    .badge {
+        font-size: 1rem;
+        padding: 10px 20px;
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/statusHub")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("ReceiveStatusUpdate", function (userId, userName, isReady, lastChanged) {
+            console.log("Status update received:", userId, userName, isReady);
+            
+            // Update the user row
+            const row = document.getElementById('user-' + userId);
+            if (row) {
+                const statusCell = row.querySelector('.status-pill');
+                const avatarCircle = row.querySelector('.avatar-circle');
+                const lastChangedCell = row.querySelector('.last-changed');
+                
+                if (isReady) {
+                    statusCell.className = 'status-pill status-ready';
+                    statusCell.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>READY';
+                    avatarCircle.classList.remove('bg-secondary');
+                    avatarCircle.classList.add('bg-success');
+                } else {
+                    statusCell.className = 'status-pill status-not-ready';
+                    statusCell.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i>NOT READY';
+                    avatarCircle.classList.remove('bg-success');
+                    avatarCircle.classList.add('bg-secondary');
+                }
+                
+                if (lastChanged) {
+                    lastChangedCell.textContent = lastChanged;
+                }
+                
+                // Highlight the row
+                row.classList.add('highlight');
+                setTimeout(() => row.classList.remove('highlight'), 2000);
+            }
+            
+            // Update counters
+            updateCounters();
+            
+            // Show toast notification
+            showToast(userName, isReady);
+        });
+
+        function updateCounters() {
+            const readyCount = document.querySelectorAll('.status-ready').length;
+            const notReadyCount = document.querySelectorAll('.status-not-ready').length;
+            
+            document.getElementById('readyCount').innerHTML = 
+                '<i class="bi bi-check-circle me-1"></i>Ready: ' + readyCount;
+            document.getElementById('notReadyCount').innerHTML = 
+                '<i class="bi bi-x-circle me-1"></i>Not Ready: ' + notReadyCount;
+        }
+
+        function showToast(userName, isReady) {
+            const toast = document.getElementById('liveToast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            if (isReady) {
+                toastMessage.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill me-2"></i><strong>' + userName + '</strong> is now <strong>READY</strong>!</span>';
+            } else {
+                toastMessage.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle-fill me-2"></i><strong>' + userName + '</strong> is now <strong>NOT READY</strong>!</span>';
+            }
+            
+            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+            bsToast.show();
+        }
+
+        // Start the connection
+        connection.start().then(function () {
+            console.log("SignalR Connected!");
+            // Join the admin group
+            connection.invoke("JoinAdminGroup").catch(function (err) {
+                console.error(err.toString());
+            });
+        }).catch(function (err) {
+            console.error(err.toString());
+        });
+
+        // Reconnect handler
+        connection.onreconnected(function () {
+            console.log("SignalR Reconnected!");
+            connection.invoke("JoinAdminGroup");
+        });
+    </script>
+}

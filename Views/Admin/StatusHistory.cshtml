@@ -1,0 +1,58 @@
+@model List<ReadyStatusApp.Models.StatusLog>
+@{
+    ViewData["Title"] = "Status History";
+}
+
+<div class="container mt-4">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-info text-white py-3">
+            <h3 class="mb-0"><i class="bi bi-clock-history me-2"></i>Status History</h3>
+        </div>
+        <div class="card-body">
+            <a asp-action="Dashboard" class="btn btn-outline-primary mb-4">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Model)
+                            {
+                                <tr>
+                                    <td>@log.User?.FullName</td>
+                                    <td>
+                                        @if (log.IsReady)
+                                        {
+                                            <span class="badge bg-success">READY</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">NOT READY</span>
+                                        }
+                                    </td>
+                                    <td>@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-clock-history text-muted" style="font-size: 4rem;"></i>
+                    <p class="mt-3 text-muted">No status history yet.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>

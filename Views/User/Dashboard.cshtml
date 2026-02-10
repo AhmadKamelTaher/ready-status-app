@@ -1,0 +1,185 @@
+@model ReadyStatusApp.Models.ApplicationUser
+@{
+    ViewData["Title"] = "My Dashboard";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-gradient text-white text-center py-4" 
+                 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <h2 class="mb-0">
+                    <i class="bi bi-person-circle me-2"></i>Welcome, @Model.FullName!
+                </h2>
+            </div>
+            <div class="card-body p-5 text-center">
+                <div class="mb-4">
+                    <h4 class="text-muted mb-4">Your Current Status</h4>
+                    
+                    <div id="statusIndicator" class="mb-4">
+                        @if (Model.IsReady)
+                        {
+                            <div class="status-badge ready">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>READY</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="status-badge not-ready">
+                                <i class="bi bi-x-circle-fill"></i>
+                                <span>NOT READY</span>
+                            </div>
+                        }
+                    </div>
+
+                    <p class="text-muted" id="lastChange">
+                        @if (Model.LastStatusChange.HasValue)
+                        {
+                            <text>Last changed: @Model.LastStatusChange.Value.ToString("MMMM dd, yyyy HH:mm:ss")</text>
+                        }
+                        else
+                        {
+                            <text>Status has not been changed yet</text>
+                        }
+                    </p>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-grid gap-3">
+                    <button id="toggleStatusBtn" class="btn btn-lg @(Model.IsReady ? "btn-danger" : "btn-success")" 
+                            onclick="toggleStatus()">
+                        <i class="bi @(Model.IsReady ? "bi-x-circle" : "bi-check-circle") me-2"></i>
+                        <span id="btnText">@(Model.IsReady ? "Set as NOT READY" : "Set as READY")</span>
+                    </button>
+                </div>
+
+                <div id="statusMessage" class="alert mt-4 d-none" role="alert"></div>
+            </div>
+        </div>
+
+        <div class="card shadow mt-4 border-0">
+            <div class="card-body p-4">
+                <h5 class="card-title"><i class="bi bi-info-circle me-2"></i>How it works</h5>
+                <p class="card-text text-muted">
+                    Click the button above to change your status. When you click "Set as READY", 
+                    the admin will be notified immediately that you are ready. 
+                    When you click "Set as NOT READY", the admin will see your status change in real-time.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 15px;
+        padding: 30px 50px;
+        border-radius: 20px;
+        font-size: 2rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .status-badge.ready {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+    }
+    
+    .status-badge.not-ready {
+        background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+        color: white;
+        box-shadow: 0 10px 30px rgba(220, 53, 69, 0.3);
+    }
+    
+    .status-badge i {
+        font-size: 3rem;
+    }
+
+    #toggleStatusBtn {
+        padding: 20px 40px;
+        font-size: 1.3rem;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+    }
+
+    #toggleStatusBtn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+</style>
+
+@section Scripts {
+    <script>
+        function toggleStatus() {
+            const btn = document.getElementById('toggleStatusBtn');
+            const btnText = document.getElementById('btnText');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+
+            fetch('/User/ToggleStatus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const isReady = data.isReady;
+                    
+                    // Update status badge
+                    if (isReady) {
+                        statusIndicator.innerHTML = `
+                            <div class="status-badge ready">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>READY</span>
+                            </div>
+                        `;
+                        btn.className = 'btn btn-lg btn-danger';
+                        btnText.innerHTML = 'Set as NOT READY';
+                    } else {
+                        statusIndicator.innerHTML = `
+                            <div class="status-badge not-ready">
+                                <i class="bi bi-x-circle-fill"></i>
+                                <span>NOT READY</span>
+                            </div>
+                        `;
+                        btn.className = 'btn btn-lg btn-success';
+                        btnText.innerHTML = 'Set as READY';
+                    }
+
+                    // Update last change time
+                    document.getElementById('lastChange').textContent = 'Last changed: Just now';
+
+                    // Show success message
+                    statusMessage.className = 'alert alert-success mt-4';
+                    statusMessage.innerHTML = '<i class="bi bi-check-circle me-2"></i>Status updated successfully! Admin has been notified.';
+                    statusMessage.classList.remove('d-none');
+                    
+                    setTimeout(() => statusMessage.classList.add('d-none'), 3000);
+                } else {
+                    throw new Error(data.message || 'Failed to update status');
+                }
+            })
+            .catch(error => {
+                statusMessage.className = 'alert alert-danger mt-4';
+                statusMessage.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>' + error.message;
+                statusMessage.classList.remove('d-none');
+            })
+            .finally(() => {
+                btn.disabled = false;
+            });
+        }
+    </script>
+    
+    @Html.AntiForgeryToken()
+}
