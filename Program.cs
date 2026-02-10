@@ -68,8 +68,8 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         
-        // Apply migrations automatically
-        context.Database.Migrate();
+        // Create database and apply migrations
+        context.Database.EnsureCreated();
 
         // Create admin user if not exists
         var adminEmail = "admin@readystatus.com";
