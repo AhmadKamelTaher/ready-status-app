@@ -11,15 +11,17 @@ builder.Services.AddControllersWithViews();
 
 // Add Database Context - Support both SQL Server (local) and PostgreSQL (cloud)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var databaseProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "SqlServer";
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (databaseProvider == "PostgreSQL" || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DATABASE_URL")))
+    if (!string.IsNullOrEmpty(databaseUrl))
     {
-        // Use PostgreSQL for cloud deployment
-        var dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL") ?? connectionString;
-        options.UseNpgsql(dbUrl);
+        // Railway PostgreSQL - parse the URL
+        var uri = new Uri(databaseUrl);
+        var userInfo = uri.UserInfo.Split(':');
+        var npgsqlConnection = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+        options.UseNpgsql(npgsqlConnection);
     }
     else
     {
